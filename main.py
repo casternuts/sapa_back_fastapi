@@ -5,11 +5,9 @@ from sapaback.api.v1.api import api_router
 from sapaback.core.config import settings
 
 from starlette.middleware.cors import CORSMiddleware
-import os
-from dotenv import load_dotenv
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-print(BASE_DIR)
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+
+
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json"

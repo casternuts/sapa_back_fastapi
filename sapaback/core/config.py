@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from pydantic import AnyHttpUrl, BaseSettings, EmailStr, HttpUrl, PostgresDsn, validator
 import os
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -18,11 +19,17 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 
     #유료키(스타트업데이)
-    OPEN_API_KEY: str = os.environ['OPEN_API_KEY']
-    naver_client_id: str = os.environ['naver_client_id']
-    naver_client_secret: str = os.environ['naver_client_secret']
-    google_search_engine_key:str = os.environ['google_search_engine_key']
-    google_search_api_key:str =os.environ['google_search_api_key']
+    # OPEN_API_KEY: str = os.environ['OPEN_API_KEY']
+    # naver_client_id: str = os.environ['naver_client_id']
+    # naver_client_secret: str = os.environ['naver_client_secret']
+    # google_search_engine_key:str = os.environ['google_search_engine_key']
+    # google_search_api_key:str =os.environ['google_search_api_key']
+
+    OPEN_API_KEY: str
+    naver_client_id: str
+    naver_client_secret: str
+    google_search_engine_key: str
+    google_search_api_key: str
 
 
     @validator("BACKEND_CORS_ORIGINS", pre=True)
@@ -37,10 +44,10 @@ class Settings(BaseSettings):
     SENTRY_DSN: Optional[HttpUrl] = None
 
 
-
-
     class Config:
-        case_sensitive = True
+        env_file = f"{Path(__file__).resolve().parent}/.env"
+        env_file_encoding = 'utf-8'
+
 
 
 settings = Settings()
