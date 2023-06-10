@@ -124,5 +124,5 @@ def get_keyword(word:str):
 
     print(word)
     #gpt를 이용해서 키워드를 뽑는다.
-    lcmain.keyword_agent(word)
+    return lcmain.keyword_agent(word)
 

@@ -11,6 +11,7 @@ from langchain.llms import OpenAI
 from sapaback.llm.lclogic.agents.keyword_agent import llm_keyword_chain,keyword_agents
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+import json
 
 from langchain.utilities import GoogleSearchAPIWrapper
 
@@ -50,19 +51,61 @@ def custom_agent_naver():
 
     return
 
-def keyword_agent(query):
+def keyword_agent(query:str):
     template = '''\
-    {word}과 연관된 음식 키워드를 분류명 5개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘 술은 제외하고.  \
-     result should be JSON in the following format: [<<분류명>:[음식명,음식명,음식명,음식명,음식명]>,....]
+    {word}과 연관된 음식 키워드를 분류명 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
+     술, 향신료 ,음료, 양념장은 제외하고 나열 해줘 \
+     result should be JSON in the following format: "[<<분류명>:[음식명,음식명,음식명,음식명,음식명]>,....]"
     '''
+
+    template = '''\
+       {word}과 연관된 음식 키워드를 분류명 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
+        술, 향신료 ,음료, 양념장은 제외하고 나열 해줘 \
+        result should be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
+       '''
 
     prompt = PromptTemplate(
         input_variables=["word"],
         template=template,
     )
     chain = LLMChain(llm=chat, prompt=prompt)
+    result :str = chain.run(query)
+    print(result)
+    print(type(result))
+    listcate =  result.split("||")
+    nestDic = dict()
 
-    print(chain.run("당뇨"))
+    for item in listcate:
+        print(item)
+        listArr = item.split("=")
+        itemlist = list()
+        keyString = ""
+        valueString = ""
+        for idx, val in enumerate(listArr):
+            print(idx,val)
+            if idx == 1:
+                print(val.replace("[","").replace("]",""))
+                valueString = val.replace("[","").replace("]\"","")
+            else:
+                print(val)
+                #keyString = val
+
+#
+
+    # 문자열을 dict 형식으로 변환하기
+    # json_object_to_dict = json.loads(result)
+    # print(type(json_object_to_dict))
+    # print(json_object_to_dict)
+    #
+    # print(json_object_to_dict.keys())
+
+    # for item in json_object_to_dict.keys():
+    #     print(json_object_to_dict[item].replace("[",""))
+    #     print(json_object_to_dict[item].replace("]", ""))
+    #     print(json_object_to_dict[item].replace("'", ""))
+
+
+    return result
 
 
 
