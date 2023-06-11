@@ -11,6 +11,7 @@ from langchain.llms import OpenAI
 from sapaback.llm.lclogic.agents.keyword_agent import llm_keyword_chain,keyword_agents
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
+import re
 import json
 
 from langchain.utilities import GoogleSearchAPIWrapper
@@ -85,11 +86,27 @@ def keyword_agent(query:str):
             print(idx,val)
             if idx == 1:
                 print(val.replace("[","").replace("]",""))
-                valueString = val.replace("[","").replace("]\"","")
-            else:
-                print(val)
-                #keyString = val
+                valueString = val.replace("[","").replace("]","").replace('"',"").strip().split(",")
 
+
+               # print("value" + valueString)
+                #print("value"+valueString.replace('"',"").strip())
+            else:
+                print("key:"+val)
+                keyString = listToString(re.compile('[가-힣]+').findall(val.strip()))
+
+
+        nestDic[keyString] = valueString
+        print(nestDic)
+
+        for idx, val in enumerate(nestDic.keys()):
+            print(idx,val)
+
+    json_val = json.dumps(nestDic,ensure_ascii=False)
+
+    print("json_val = %s" % json_val)
+
+    print("json_val type = %s" % type(json_val))
 #
 
     # 문자열을 dict 형식으로 변환하기
@@ -111,6 +128,12 @@ def keyword_agent(query:str):
 
 
    # keyword_agents.run("여름과 관련된 음식 키워드를 한국어로 5개 뽑아줘 형식은 json으로 제공해줘")
+
+def listToString(str_list):
+    result = ""
+    for s in str_list:
+        result += s + " "
+    return result.strip()
 
 def summary_agent():
     # template = '''\
