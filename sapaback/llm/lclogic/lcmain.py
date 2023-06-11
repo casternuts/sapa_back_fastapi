@@ -3,7 +3,7 @@
 
 from langchain.chat_models import ChatOpenAI
 from langchain.callbacks import get_openai_callback
-from sapaback.core.config import settings
+
 from sapaback.llm.lclogic.tools.def_test_tool import agent
 from sapaback.llm.lclogic.agents.weather_agent import agents
 from sapaback.llm.lclogic.agents.naver_api_agent import agents_naver
@@ -13,7 +13,10 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 import re
 import json
-
+import urllib.request
+from sapaback.core.config import settings
+client_id = settings.naver_client_id
+client_secret =settings.naver_client_secret
 from langchain.utilities import GoogleSearchAPIWrapper
 
 #전역 변수 오픈 ai 생성
@@ -61,8 +64,8 @@ def keyword_agent(query:str):
 
     template = '''\
        {word}과 연관된 음식 키워드를 분류명 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
-        술, 향신료 ,음료, 양념장은 제외하고 나열 해줘 \
-        result should be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
+        술, 향신료 ,음료, 양념장은 제외하고 나열 해줘.  \
+        result must be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
        '''
 
     prompt = PromptTemplate(
@@ -71,38 +74,67 @@ def keyword_agent(query:str):
     )
     chain = LLMChain(llm=chat, prompt=prompt)
     result :str = chain.run(query)
-    print(result)
-    print(type(result))
+    # print(result)
+    # print(type(result))
     listcate =  result.split("||")
     nestDic = dict()
 
-    for item in listcate:
+    nestDic["startDate"] = "2023-05-01"
+    nestDic["endDate"] = "2023-05-30"
+    nestDic["timeUnit"] = "date" #date week month
+    keywordGroupsList = list()
+    for idxitem, item in enumerate(listcate):
         print(item)
         listArr = item.split("=")
         itemlist = list()
+
         keyString = ""
         valueString = ""
         for idx, val in enumerate(listArr):
+            keywordGroupsDict = dict()
             print(idx,val)
             if idx == 1:
-                print(val.replace("[","").replace("]",""))
                 valueString = val.replace("[","").replace("]","").replace('"',"").strip().split(",")
+                # print("##########################")
+                # print(len(valueString))
+                # print("##########################")
+                #공백 제거
+                for idx, val in enumerate(valueString):
+                    valueString[idx] = val.strip()
+                    print("테스트: "+valueString[idx])
+                keywordGroupsDict["groupName"] = keyString
+                keywordGroupsDict["keywords"] = valueString
+                keywordGroupsList.append(keywordGroupsDict)
 
-
-               # print("value" + valueString)
-                #print("value"+valueString.replace('"',"").strip())
             else:
-                print("key:"+val)
-                keyString = listToString(re.compile('[가-힣]+').findall(val.strip()))
+                keyString =listToString(re.compile('[가-힣]+').findall(val.strip()))
+                print("key:" + keyString)
+                #keywordGroupsDict["groupName"] = keyString
+            # 리스트에 삽입
 
 
-        nestDic[keyString] = valueString
-        print(nestDic)
+        #dict 자료형에 그룹 리스트 삽입
+        nestDic["keywordGroups"] = keywordGroupsList
+        nestDic["device"] = "mo" #pc,mo
 
-        for idx, val in enumerate(nestDic.keys()):
-            print(idx,val)
 
-    json_val = json.dumps(nestDic,ensure_ascii=False)
+        agelist = list(); # 1:1~12,2:13~18,3:19~24,4:25~29 5:30~34,6:35~39,7:40~44,8:45~49,9:50~54,10:55~59,11:60세이상
+        agelist.append("1")
+        agelist.append("2")
+        agelist.append("4")
+        agelist.append("5")
+        agelist.append("6")
+        agelist.append("7")
+        nestDic["ages"] = agelist
+        nestDic["gender"] = "m" #m 남자 f 여자
+
+        # print(nestDic)
+
+        result_dict = naver_trand(nestDic)
+        # for idx, val in enumerate(nestDic.keys()):
+        #     print(idx,val)
+
+    json_val = json.dumps(result_dict,ensure_ascii=False)
 
     print("json_val = %s" % json_val)
 
@@ -122,13 +154,50 @@ def keyword_agent(query:str):
     #     print(json_object_to_dict[item].replace("'", ""))
 
 
-    return result
+    return result_dict
 
 
 
 
    # keyword_agents.run("여름과 관련된 음식 키워드를 한국어로 5개 뽑아줘 형식은 json으로 제공해줘")
 
+def naver_trand(nestDic):
+    url = "https://openapi.naver.com/v1/datalab/search"  # json 결과
+    # url = "https://openapi.naver.com/v1/search/blog.xml?query=" + encText # xml 결과
+    # print(nestDic)
+    dict_post =nestDic
+    post_data = json.dumps(dict_post, ensure_ascii=False)
+    details = urllib.parse.urlencode(dict_post)
+    details = details.encode('UTF-8')
+    # print("Dictionary Type : ", type(dict_post))
+    # print("Dictionary : ", dict_post)
+    # print("JSON Type : ", type(post_data))
+    # print("JSON : ", post_data)
+    request = urllib.request.Request(url, details)
+    request.add_header("X-Naver-Client-Id", client_id)
+    request.add_header("X-Naver-Client-Secret", client_secret)
+    request.add_header("Content-Type", "application/json")
+    response = urllib.request.urlopen(request, data=post_data.encode("utf-8"))
+    rescode = response.getcode()
+    if (rescode == 200):
+        response_body = response.read()
+        # dict로 변환
+        # 전체 JSON을 dict type으로 가져옴
+        dict = json.loads(response_body.decode('utf-8'))
+
+        # print(type(dict))
+        # print(dict)
+
+        # items= dict["items"]
+        # for item in items:
+        #       #print(item)
+        #       print(type(item))
+        #       print(item["description"])
+        return dict
+        #return response_body.decode('utf-8')
+    else:
+        print("Error Code:" + rescode)
+        return rescode
 def listToString(str_list):
     result = ""
     for s in str_list:
