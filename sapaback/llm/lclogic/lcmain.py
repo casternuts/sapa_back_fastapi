@@ -18,6 +18,40 @@ from sapaback.core.config import settings
 client_id = settings.naver_client_id
 client_secret =settings.naver_client_secret
 from langchain.utilities import GoogleSearchAPIWrapper
+# from langchain.document_loaders.csv_loader import CSVLoader
+from langchain.document_loaders import CSVLoader
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.chains import RetrievalQA
+from langchain.llms import OpenAI
+
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import re
+from langchain.document_loaders import PyPDFLoader
+from langchain.document_loaders import CSVLoader
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import Chroma
+from glob import glob
+from langchain.docstore.document import Document
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts.chat import (
+    ChatPromptTemplate,
+    SystemMessagePromptTemplate,
+    HumanMessagePromptTemplate,
+)
+from langchain.chains import RetrievalQAWithSourcesChain
+import requests
+from typing import List, Tuple, Any, Union
+from langchain.schema import AgentAction, AgentFinish
+from langchain.agents import Tool, AgentExecutor, BaseMultiActionAgent
+from langchain.agents.agent import BaseSingleActionAgent
+
 
 #전역 변수 오픈 ai 생성
 chat = OpenAI(openai_api_key=settings.OPEN_API_KEY, model_name='gpt-3.5-turbo')
@@ -25,6 +59,93 @@ from langchain.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate
 )
+
+output =[]
+def csv_search(query:str):
+    FILE_NAME = 'D:\pycharmpjt\sapa_back\sapaback\llm\lclogic\TB_GGG_ansi2.csv'
+    loader = CSVLoader(FILE_NAME)
+    # Load the documents
+    # loader = CSVLoader(file_path=FILE_NAME, csv_args={
+    #     'delimiter': ',',
+    #     'quotechar': '"',
+    #     'fieldnames': ['item_code', 'item_name']
+    # },encoding= 'utf8')
+    documents = loader.load()
+
+
+    # text 정제
+    for page in documents:
+        text = page.page_content
+        text = re.sub('\n', ' ', text)  # Replace newline characters with a space
+        text = re.sub('\t', ' ', text)  # Replace tab characters with a space
+        text = re.sub(' +', ' ', text)  # Reduce multiple spaces to single
+        output.append(text)
+
+    print(output)
+    #
+    doc_chunks = []
+    #
+    for line in output:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,  # 최대 청크 길이
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],  # 텍스트를 청크로 분할하는 데 사용되는 문자 목록
+            chunk_overlap=0,  # 인접한 청크 간에 중복되는 문자 수
+        )
+        chunks = text_splitter.split_text(line)
+        for i, chunk in enumerate(chunks):
+            doc = Document(
+                page_content=chunk, metadata={"page": i, "source": FILE_NAME}
+            )
+            doc_chunks.append(doc)
+
+    embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
+    index = Chroma.from_documents(doc_chunks, embeddings)
+    #
+    system_template = """To answer the question at the end, use the following context. If you don't know the answer, just say you don't know and don't try to make up an answer.
+    You should only reply to items you recommend.
+
+    Below is an example.
+    “Please make a diet based on the chat information."
+
+    you only answer in Korean
+
+    {summaries}
+    """
+    messages = [
+        SystemMessagePromptTemplate.from_template(system_template),
+        HumanMessagePromptTemplate.from_template("{question}")
+    ]
+    prompt = ChatPromptTemplate.from_messages(messages)
+
+    chain_type_kwargs = {"prompt": prompt}
+    bk_chain = RetrievalQAWithSourcesChain.from_chain_type(
+        ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0),
+        chain_type="stuff",
+        retriever=index.as_retriever(),
+        chain_type_kwargs=chain_type_kwargs,
+        # reduce_k_below_max_tokens=True
+    )
+
+    result = bk_chain({"question": query+'와 비슷한 항목을 code와 함께 나열해줘 itemname 중복된건 빼고'})
+
+    print(f"질문 : {result['question']}")
+    print()
+    print(f"답변 : {result['answer']}")
+    # index_creator = VectorstoreIndexCreator()
+    # docsearch = index_creator.from_loaders([loader])
+    # #
+    # chain = RetrievalQA.from_chain_type(llm=OpenAI(openai_api_key=settings.OPEN_API_KEY, model_name='gpt-3.5-turbo'), chain_type="stuff",
+    #                                     retriever=docsearch.vectorstore.as_retriever(), input_key="question")
+    # # data = loader.load()
+    # # print(data)
+    #
+    # # # Pass a query to the chain
+    # query = "바베큐와 비슷한 항목을 나열해줘"
+    # response = chain({"question": query})
+    # print(response['result'])
+
+
+
 
 
 def run():
