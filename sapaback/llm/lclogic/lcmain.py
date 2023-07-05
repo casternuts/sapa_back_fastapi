@@ -102,10 +102,7 @@ def csv_search(query:str):
     index = Chroma.from_documents(doc_chunks, embeddings)
     #
     system_template = """To answer the question at the end, use the following context. If you don't know the answer, just say you don't know and don't try to make up an answer.
-    You should only reply to items you recommend.
-
-    Below is an example.
-    “Please make a diet based on the chat information."
+    You should only mention the food names that are similar to or relevant to the provided keyword.
 
     you only answer in Korean
 
@@ -126,7 +123,7 @@ def csv_search(query:str):
         # reduce_k_below_max_tokens=True
     )
 
-    result = bk_chain({"question": query+'와 비슷한 항목을 code와 함께 나열해줘 itemname 중복된건 빼고'})
+    result = bk_chain({"question": query+'와 같은 분류에 속하거나 비슷한 음식으로 판단되는 항목을 code와 함께 나열해줘 itemname 중복된건 빼고 형식은 [{"code":<<code>>,"itemname":<<itemname>>},{"code":<<code>>,"itemname":<<itemname>>}....]'})
 
     print(f"질문 : {result['question']}")
     print()
@@ -143,6 +140,16 @@ def csv_search(query:str):
     # query = "바베큐와 비슷한 항목을 나열해줘"
     # response = chain({"question": query})
     # print(response['result'])
+    dict = json.loads(result['answer'])
+    type(dict)
+    print(type(dict))
+    for item in dict:
+        print(item)
+        print(item['code'])
+        print(item['itemname'])
+        print(type(item))
+    json_data = json.dumps(dict,ensure_ascii=False)
+    return json_data
 
 
 
@@ -184,8 +191,12 @@ def keyword_agent(query:str):
     '''
 
     template = '''\
-       {word}과 연관된 음식 키워드를 분류명 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
+       {word}과 연관된 음식 키워드를 '분류명' 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
         술, 향신료 ,음료, 양념장은 제외하고 나열 해줘.  \
+        for example, 
+        해산물=[생선,조개,굴,새우,꽃게]
+        찌개=[김치찌개,된장찌개,부대찌개,짜글이,마라탕찌개]
+        If you don't know the answer, just say you don't know and don't try to make up an answer. \
         result must be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
        '''
 
