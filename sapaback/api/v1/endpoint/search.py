@@ -132,3 +132,10 @@ def get_csv_item(word:str):
     print(word)
     #gpt를 이용해서 키워드를 뽑는다.
     return lcmain.csv_search(word)
+
+@router.get("/reviewselect/{word}")
+def get_item_review(word:str):
+
+    print(word)
+    #gpt를 이용해서 키워드를 뽑는다.
+    return lcmain.review_search(word)
