@@ -62,7 +62,7 @@ from langchain.prompts import (
 
 output =[]
 def csv_search(query:str):
-    FILE_NAME = 'D:\pycharmpjt\sapa_back\sapaback\llm\lclogic\TB_GGG_ansi2.csv'
+    FILE_NAME = 'D:\sapaback\sapaback\llm\lclogic\TB_GGG_ansi2.csv'
     loader = CSVLoader(FILE_NAME)
     # Load the documents
     # loader = CSVLoader(file_path=FILE_NAME, csv_args={
@@ -71,7 +71,6 @@ def csv_search(query:str):
     #     'fieldnames': ['item_code', 'item_name']
     # },encoding= 'utf8')
     documents = loader.load()
-
 
     # text 정제
     for page in documents:
@@ -150,6 +149,108 @@ def csv_search(query:str):
         print(type(item))
     json_data = json.dumps(dict,ensure_ascii=False)
     return json_data
+
+import csv
+output_review =[]
+def review_search(query:str):
+    FILE_NAME = 'D:\sapaback\sapaback\llm\lclogic\GreatingReview.csv'
+    review_list =[]
+    review_list_csv = []
+    with open(FILE_NAME, "r") as f:
+        reader = csv.DictReader(f, delimiter=",", quotechar="\"")
+        data_list = [row for row in reader]
+        print(type(data_list))
+        print(len(data_list))
+        for item in data_list:
+            if item['itemname'] == query:
+                review_list_csv.append(item)
+                #print(item)
+                #청크 전처리
+                contents = item['contents']
+                contents = re.sub('\n', ' ', contents)  # Replace newline characters with a space
+                contents = re.sub('\t', ' ', contents)  # Replace tab characters with a space
+                contents = re.sub(' +', ' ', contents)  # Reduce multiple spaces to single
+                item['contents'] =contents
+                itemname = item['itemname']
+                itemname = re.sub('\n', ' ', itemname)  # Replace newline characters with a space
+                itemname = re.sub('\t', ' ', itemname)  # Replace tab characters with a space
+                itemname = re.sub(' +', ' ', itemname)  # Reduce multiple spaces to single
+                item['itemname'] = itemname
+                review_list.append('itemname: '+itemname+' '+'contents: '+contents)
+
+    # 리스트를 CSV 형식으로 변환.
+    with open("output.csv", "w", newline="") as f:
+        fieldnames=['itemname','contents']
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(review_list_csv)
+
+
+    FILE_NAME = "output.csv"
+    loader = CSVLoader(FILE_NAME)
+    #
+    documents = loader.load()
+    output=[]
+    for page in documents:
+        text = page.page_content
+        print(text)
+        # text = re.sub('\n', ' ', text)  # Replace newline characters with a space
+        # text = re.sub('\t', ' ', text)  # Replace tab characters with a space
+        # text = re.sub(' +', ' ', text)  # Reduce multiple spaces to single
+        output.append(text)
+        print(output)
+
+    #
+    #
+    doc_chunks = []
+    #
+    for line in output:
+        print('line: '+str(line))
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,  # 최대 청크 길이
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],  # 텍스트를 청크로 분할하는 데 사용되는 문자 목록
+            chunk_overlap=0,  # 인접한 청크 간에 중복되는 문자 수
+        )
+        chunks = text_splitter.split_text(line)
+        #print('chunks: '+chunks)
+        for i, chunk in enumerate(chunks):
+            doc = Document(
+                page_content=chunk, metadata={"page": i, "source": FILE_NAME}
+            )
+            doc_chunks.append(doc)
+
+    embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
+    index = Chroma.from_documents(doc_chunks, embeddings)
+    #
+    system_template = """To answer the question at the end, use the following context.
+    If you don't know the answer, just say you don't know and don't try to make up an answer.
+    You should only mention the marketing insight that are similar to or relevant to the provided contents.       
+       you only answer in Korean
+       
+
+       {summaries}
+       """
+    messages = [
+        SystemMessagePromptTemplate.from_template(system_template),
+        HumanMessagePromptTemplate.from_template("{question}")
+    ]
+    prompt = ChatPromptTemplate.from_messages(messages)
+
+    chain_type_kwargs = {"prompt": prompt}
+    bk_chain = RetrievalQAWithSourcesChain.from_chain_type(
+        ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0),
+        chain_type="stuff",
+        retriever=index.as_retriever(),
+        chain_type_kwargs=chain_type_kwargs,
+        # reduce_k_below_max_tokens=True
+    )
+
+    result = bk_chain({"question": query + '제품의 contents 내용을 이용해 장점 또는 단점을 분석하고 제품을 어떤 관점으로 판매하면 좋을지 얘기해줘 '})
+    #result = bk_chain({"question": query + '제품의 contents 내용을 이용해 contents의 전체적인 요약과 마케팅 인사이트를 제시해 '})
+
+    print(f"질문 : {result['question']}")
+    print()
+    print(f"답변 : {result['answer']}")
 
 
 
