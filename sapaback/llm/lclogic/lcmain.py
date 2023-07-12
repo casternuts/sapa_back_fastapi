@@ -100,9 +100,11 @@ def csv_search(query:str):
     embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
     index = Chroma.from_documents(doc_chunks, embeddings)
     #
-    system_template = """To answer the question at the end, use the following context. If you don't know the answer, just say you don't know and don't try to make up an answer.
-    You should only mention the food names that are similar to or relevant to the provided keyword.
-
+    system_template = """To answer the question at the end, use the following context. If you don't know the answer, just say you don't know and don't try to make up an answer.    
+    for example
+    탕은 국,찌개
+    면은 파스타,라면,소면,비빔면
+        
     you only answer in Korean
 
     {summaries}
@@ -115,14 +117,14 @@ def csv_search(query:str):
 
     chain_type_kwargs = {"prompt": prompt}
     bk_chain = RetrievalQAWithSourcesChain.from_chain_type(
-        ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0),
+        ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0.1),
         chain_type="stuff",
         retriever=index.as_retriever(),
         chain_type_kwargs=chain_type_kwargs,
         # reduce_k_below_max_tokens=True
     )
 
-    result = bk_chain({"question": query+'와 같은 분류에 속하거나 비슷한 음식으로 판단되는 항목을 code와 함께 나열해줘 itemname 중복된건 빼고 형식은 [{"code":<<code>>,"itemname":<<itemname>>},{"code":<<code>>,"itemname":<<itemname>>}....]'})
+    result = bk_chain({"question": "'"+query+"'"+' 과 같은 분류거나 연관된 음식 항목을 code와 함께 나열해줘 itemname 중복된건 빼고'+query+ '중 어떤 항목과 연관된건지 reason도 명시해줘 형식은 [{"code":<<code>>,"itemname":<<itemname>>,"reason":<<reason>>},{"code":<<code>>,"itemname":<<itemname>>,"reason":<<reason>>}....]'})
 
     print(f"질문 : {result['question']}")
     print()
@@ -184,8 +186,6 @@ def review_search(query:str):
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(review_list_csv)
-
-
     FILE_NAME = "output.csv"
     loader = CSVLoader(FILE_NAME)
     #
@@ -193,13 +193,8 @@ def review_search(query:str):
     output=[]
     for page in documents:
         text = page.page_content
-        print(text)
-        # text = re.sub('\n', ' ', text)  # Replace newline characters with a space
-        # text = re.sub('\t', ' ', text)  # Replace tab characters with a space
-        # text = re.sub(' +', ' ', text)  # Reduce multiple spaces to single
+        #불러온 csv 파일을 document형식으로 바꾼다.
         output.append(text)
-        print(output)
-
     #
     #
     doc_chunks = []
@@ -301,23 +296,39 @@ def keyword_agent(query:str):
         result must be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
        '''
 
+    template = '''\
+           {word}과 연관된 음식 키워드를 '음식 분류명' 3개 이하로 뽑고,  음식 분류에 속해 있는 음식명으로 묶어서 최소 1개 이상씩 나열해 줘.   \
+            술, 양념장은 제외하고 나열 해줘.  \
+            for example, 
+            해산물=[생선,조개,굴,새우,꽃게] || 찌개=[김치찌개,된장찌개,부대찌개,짜글이,마라탕찌개] || ..... 
+            If you don't know the answer, just say you don't know and don't try to make up an answer. and result count is lower then 5 \
+            result must be string in the following format: "<음식 분류명>=[<<value>>,<<value>>,<<value>>] || <음식 분류명>=[<<value>>,<<value>>,<<value>>] || ...."
+           '''
+
     prompt = PromptTemplate(
         input_variables=["word"],
         template=template,
     )
     chain = LLMChain(llm=chat, prompt=prompt)
     result :str = chain.run(query)
-    # print(result)
+    print('###########')
+    print('result1: '+result)
+    result = re.sub('\n', '||', result)
+    print('result2: '+result)
+    print('###########')
     # print(type(result))
     listcate =  result.split("||")
     nestDic = dict()
-
+    print('listcate',listcate)
+    print('listcate 크기', len(listcate))
     nestDic["startDate"] = "2023-05-01"
     nestDic["endDate"] = "2023-05-30"
     nestDic["timeUnit"] = "date" #date week month
     keywordGroupsList = list()
     for idxitem, item in enumerate(listcate):
-        print(item)
+        print('################@@@@@')
+        print("idxitem:"+str(idxitem)+'번째, '+ item)
+        print('################@@@@@')
         listArr = item.split("=")
         itemlist = list()
 
@@ -334,36 +345,37 @@ def keyword_agent(query:str):
                 #공백 제거
                 for idx, val in enumerate(valueString):
                     valueString[idx] = val.strip()
-                    print("테스트: "+valueString[idx])
+
                 keywordGroupsDict["groupName"] = keyString
                 keywordGroupsDict["keywords"] = valueString
+                print("keyString: " +keyString)
+                print("keywords: "  ,valueString)
                 keywordGroupsList.append(keywordGroupsDict)
 
             else:
-                keyString =listToString(re.compile('[가-힣]+').findall(val.strip()))
-                print("key:" + keyString)
-                #keywordGroupsDict["groupName"] = keyString
-            # 리스트에 삽입
+                 keyString =listToString(re.compile('[가-힣]+').findall(val.strip()))
+                 print("key:" + keyString)
 
 
-        #dict 자료형에 그룹 리스트 삽입
-        nestDic["keywordGroups"] = keywordGroupsList
-        nestDic["device"] = "mo" #pc,mo
+
+    #dict 자료형에 그룹 리스트 삽입
+    nestDic["keywordGroups"] = keywordGroupsList
+    nestDic["device"] = "mo" #pc,mo
 
 
-        agelist = list(); # 1:1~12,2:13~18,3:19~24,4:25~29 5:30~34,6:35~39,7:40~44,8:45~49,9:50~54,10:55~59,11:60세이상
-        agelist.append("1")
-        agelist.append("2")
-        agelist.append("4")
-        agelist.append("5")
-        agelist.append("6")
-        agelist.append("7")
-        nestDic["ages"] = agelist
-        nestDic["gender"] = "m" #m 남자 f 여자
+    agelist = list(); # 1:1~12,2:13~18,3:19~24,4:25~29 5:30~34,6:35~39,7:40~44,8:45~49,9:50~54,10:55~59,11:60세이상
+    agelist.append("1")
+    agelist.append("2")
+    agelist.append("4")
+    agelist.append("5")
+    agelist.append("6")
+    agelist.append("7")
+    nestDic["ages"] = agelist
+    nestDic["gender"] = "m" #m 남자 f 여자
 
         # print(nestDic)
 
-        result_dict = naver_trand(nestDic)
+    result_dict = naver_trand(nestDic)
         # for idx, val in enumerate(nestDic.keys()):
         #     print(idx,val)
 
@@ -400,6 +412,7 @@ def naver_trand(nestDic):
     # print(nestDic)
     dict_post =nestDic
     post_data = json.dumps(dict_post, ensure_ascii=False)
+    print(post_data)
     details = urllib.parse.urlencode(dict_post)
     details = details.encode('UTF-8')
     # print("Dictionary Type : ", type(dict_post))
@@ -410,6 +423,7 @@ def naver_trand(nestDic):
     request.add_header("X-Naver-Client-Id", client_id)
     request.add_header("X-Naver-Client-Secret", client_secret)
     request.add_header("Content-Type", "application/json")
+    print(url,details)
     response = urllib.request.urlopen(request, data=post_data.encode("utf-8"))
     rescode = response.getcode()
     if (rescode == 200):
