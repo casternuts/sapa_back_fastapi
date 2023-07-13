@@ -46,6 +46,8 @@ from langchain.prompts.chat import (
     HumanMessagePromptTemplate,
 )
 from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.chains import ChatVectorDBChain
+
 import requests
 from typing import List, Tuple, Any, Union
 from langchain.schema import AgentAction, AgentFinish
@@ -61,8 +63,8 @@ from langchain.prompts import (
 )
 
 output =[]
-def csv_search(query:str):
-    FILE_NAME = 'D:\sapaback\sapaback\llm\lclogic\TB_GGG_ansi2.csv'
+def csv_search(query:str,category:str):
+    FILE_NAME = 'gretingcategoryinclude2.csv'
     loader = CSVLoader(FILE_NAME)
     # Load the documents
     # loader = CSVLoader(file_path=FILE_NAME, csv_args={
@@ -100,13 +102,29 @@ def csv_search(query:str):
     embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
     index = Chroma.from_documents(doc_chunks, embeddings)
     #
-    system_template = """To answer the question at the end, use the following context. If you don't know the answer, just say you don't know and don't try to make up an answer.    
-    for example
-    탕은 국,찌개
-    면은 파스타,라면,소면,비빔면
-        
-    you only answer in Korean
 
+
+
+    system_template = """To answer the question at the end, use the following context. 
+    If you don't know the answer, just say you don't know and don't try to make up an answer.
+    비슷한 종류의 음식을 골라야 한다. 
+    아이스크림은 디저트 종류에 해당하니 디저트에 해당하는 제품을 모두 골라주면되고
+    바베큐는 생선구이, 육류 구이, 채소 구이 
+    탕은 찌개 국
+    파스타는 면,소바,국수,라면
+    과일은 과일이 들어간 음료나 빵 디저트 혹은 음식
+    you only answer in Korean
+    주어진 음식과 비슷한 항목을 찾는다.
+    아래는 반드시 지켜야 할 조건이야
+    -------------------------------
+    1. 음식을 구분하는 종류가 같거나 비슷한 항목
+    for example:
+    바베큐는 소고기 돼지고기 부위를 구이 하거나 생선 (삼치 구이,고등어 구이...)를 구이하는 것과 같고 , 탕은 찌개 국, 파스타는 면,소바,국수,라면, 과일은 과일이 들어간 음료나 빵 디저트 혹은 음식
+    
+    2. 주어진 키워드 개수에 맞춰서 골고루 비슷한 음식을 찾는다
+    3. 음식을 구성하고 있는 재료가 비슷한 음식을 찾는다
+    4. 이유는 정확 해야 하며 잘 모르겠다면 해당 항목은 찾지 않는다.
+    ----------------------------------------------------------
     {summaries}
     """
     messages = [
@@ -117,45 +135,198 @@ def csv_search(query:str):
 
     chain_type_kwargs = {"prompt": prompt}
     bk_chain = RetrievalQAWithSourcesChain.from_chain_type(
-        ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0.1),
+        ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0.3),
         chain_type="stuff",
         retriever=index.as_retriever(),
         chain_type_kwargs=chain_type_kwargs,
         # reduce_k_below_max_tokens=True
     )
 
-    result = bk_chain({"question": "'"+query+"'"+' 과 같은 분류거나 연관된 음식 항목을 code와 함께 나열해줘 itemname 중복된건 빼고'+query+ '중 어떤 항목과 연관된건지 reason도 명시해줘 형식은 [{"code":<<code>>,"itemname":<<itemname>>,"reason":<<reason>>},{"code":<<code>>,"itemname":<<itemname>>,"reason":<<reason>>}....]'})
+    # result = bk_chain({"question": "'"+query+"'"+'는'+ category +' 로 묶인 음식들이야. 이걸 참고해서 관련있다고 판단되는 음식 항목을 itemcode와 함께 나열해 줘. 냉면,라면,파스타,소바는 면이야, 찌개는 탕과 국이랑 유사한 분류야  '
+    #                                              ' itemname 중복 빼고 왜 선택된 건지 reason도 명시해줘. 형식은 [{"itemcode":<<itemcode>>,"itemname":<<itemname>>,"reason":<<reason>>},{"itemcode":<<itemcode>>,"itemname":<<itemname>>,"reason":<<reason>>}....]'})
 
+    result = bk_chain({"question": "'"+query+"'"+'는 모두 '+ category +'에 속한다. '+query+'의 음식으로서 공통점을 찾고 같은 공통점을 가진 항목을 itemcode와 함께 최소 2개이상 나열해 줘.'
+                                                 '나열 된 reason도 명시해 줘. 형식은 [{"itemcode":<<itemcode>>,"itemname":<<itemname>>,"reason":<<reason>>},{"itemcode":<<itemcode>>,"itemname":<<itemname>>,"reason":<<reason>>}....]'})
     print(f"질문 : {result['question']}")
     print()
     print(f"답변 : {result['answer']}")
-    # index_creator = VectorstoreIndexCreator()
-    # docsearch = index_creator.from_loaders([loader])
-    # #
-    # chain = RetrievalQA.from_chain_type(llm=OpenAI(openai_api_key=settings.OPEN_API_KEY, model_name='gpt-3.5-turbo'), chain_type="stuff",
-    #                                     retriever=docsearch.vectorstore.as_retriever(), input_key="question")
-    # # data = loader.load()
-    # # print(data)
-    #
-    # # # Pass a query to the chain
-    # query = "바베큐와 비슷한 항목을 나열해줘"
-    # response = chain({"question": query})
-    # print(response['result'])
+
     dict = json.loads(result['answer'])
     type(dict)
     print(type(dict))
     for item in dict:
         print(item)
-        print(item['code'])
+        print(item['itemcode'])
         print(item['itemname'])
         print(type(item))
     json_data = json.dumps(dict,ensure_ascii=False)
     return json_data
 
+
+def csv_search_split(query: str, category: str):
+    FILE_NAME = 'gretingcategoryinclude2.csv'
+    loader = CSVLoader(FILE_NAME)
+    # Load the documents
+
+    documents = loader.load()
+
+    # text 정제
+    for page in documents:
+        text = page.page_content
+        text = re.sub('\n', ' ', text)  # Replace newline characters with a space
+        text = re.sub('\t', ' ', text)  # Replace tab characters with a space
+        text = re.sub(' +', ' ', text)  # Reduce multiple spaces to single
+        output.append(text)
+
+
+    #
+    doc_chunks = []
+    #
+    for line in output:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,  # 최대 청크 길이
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],  # 텍스트를 청크로 분할하는 데 사용되는 문자 목록
+            chunk_overlap=0,  # 인접한 청크 간에 중복되는 문자 수
+        )
+        chunks = text_splitter.split_text(line)
+        for i, chunk in enumerate(chunks):
+            doc = Document(
+                page_content=chunk, metadata={"page": i, "source": FILE_NAME}
+            )
+            doc_chunks.append(doc)
+
+    embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
+    index = Chroma.from_documents(doc_chunks, embeddings)
+    model = ChatOpenAI(openai_api_key=settings.OPEN_API_KEY,temperature=0, model_name="gpt-3.5-turbo")
+    chain = ChatVectorDBChain.from_llm(model,index,return_source_documents=True)
+
+    # gpt를 이용해서 키워드를 뽑는다.
+    resultList = []
+    listcate = query.split(",")
+    for idxitem, item in enumerate(listcate):
+        print(item)
+       # question = category+"에 속한 "+ item + "비슷한 종류인 항목을 나열하고, 왜 나열했는지 이유를 알려줘."
+        question = category + "에 속한 " + item + "비슷한 종류인 항목을 나열해"
+
+        system_template = """To answer the question at the end, use the following context. 
+       If you don't know the answer, just say you don't know and don't try to make up an answer.
+       you only answer in Korean. 
+        but if there are no answers, you say [{"itemcode":"없음" itemname":"없음","reason":"없음"}]
+       
+       answer form example
+       [{"itemcode":<<itemcode>>,"itemname":<<itemname>>},{"itemcode":<<itemcode>>,"itemname":<<itemname>>}....] 
+       아래는 반드시 지켜야 할 조건이야
+       -------------------------------
+       1. 메인음식, 디저트, 빙과류, 반찬, 가볍게 먹기 좋은 음식, 간식 으로 구분 한 후 해당 하는 카테고리를 찾아 검색할 것.
+       2. 반드시 비슷한 종류만 나열할 것
+       for example:
+       바베큐는 소고기 돼지고기 부위를 구이 하거나 생선 (삼치 구이,고등어 구이...)를 구이 하는 것과 같고 , 탕은 찌개 국, 파스타는 면,소바,국수,라면, 과일은 과일이 들어간 음료나 빵 디저트 혹은 음식
+       2. 음식을 구성하고 있는 재료가 비슷한 음식을 찾는다
+      
+       ----------------------------------------------------------
+       """
+
+        #[{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
+
+
+        question= question+ system_template
+        #docs = index.similarity_search(question)
+        result = chain({"question":question,"chat_history":[]})
+        # print results
+        print(result['answer'])
+        dict = json.loads(result['answer'])
+        for item in dict:
+            print(item)
+            print(item['itemcode'])
+            print(item['itemname'])
+            print(type(item))
+            resultList.append(item)
+    json_data = json.dumps(resultList, ensure_ascii=False)
+    return json_data
+
+
+def csv_search_non_split(query: str, category: str):
+    FILE_NAME = 'gretingcategoryinclude2.csv'
+    loader = CSVLoader(FILE_NAME)
+    # Load the documents
+
+    documents = loader.load()
+
+    # text 정제
+    for page in documents:
+        text = page.page_content
+        text = re.sub('\n', ' ', text)  # Replace newline characters with a space
+        text = re.sub('\t', ' ', text)  # Replace tab characters with a space
+        text = re.sub(' +', ' ', text)  # Reduce multiple spaces to single
+        output.append(text)
+
+    #
+    doc_chunks = []
+    #
+    for line in output:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,  # 최대 청크 길이
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],  # 텍스트를 청크로 분할하는 데 사용되는 문자 목록
+            chunk_overlap=0,  # 인접한 청크 간에 중복되는 문자 수
+        )
+        chunks = text_splitter.split_text(line)
+        for i, chunk in enumerate(chunks):
+            doc = Document(
+                page_content=chunk, metadata={"page": i, "source": FILE_NAME}
+            )
+            doc_chunks.append(doc)
+
+    embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
+    index = Chroma.from_documents(doc_chunks, embeddings)
+    model = ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0.1, model_name="gpt-3.5-turbo")
+    chain = ChatVectorDBChain.from_llm(model, index, return_source_documents=True)
+
+    # gpt를 이용해서 키워드를 뽑는다.
+    resultList = []
+
+        # question = category+"에 속한 "+ item + "비슷한 종류인 항목을 나열하고, 왜 나열했는지 이유를 알려줘."
+    question = category + "에 속한 " + query + "을 ',' 단위로 구분해서 각각 비슷한 종류인 항목을 나열해, 왜 나열했는지 이유를 자세히 알려줘."
+
+    system_template = """To answer the question at the end, use the following context. 
+       If you don't know the answer, just say you don't know and don't try to make up an answer.
+       you only answer in Korean. 
+        but if there are no answers, you say [{"itemcode":"없음" itemname":"없음","reason":"없음"}]
+
+       answer form example
+       [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
+       아래는 반드시 지켜야 할 조건이야
+       -------------------------------
+        1. 음식을 구분하는 종류가 같거나 비슷한 항목
+        for example:
+        바베큐는 소고기 돼지고기 부위를 구이 하거나 생선 (삼치 구이,고등어 구이...)를 구이하는 것과 같고 , 탕은 찌개 국, 파스타는 면,소바,국수,라면, 과일은 과일이 들어간 음료나 빵 디저트 혹은 음식
+    
+        2. 주어진 키워드 개수에 맞춰서 골고루 비슷한 음식을 찾는다
+        3. 음식을 구성하고 있는 재료가 비슷한 음식을 찾는다
+        4. 이유는 정확 해야 하며 잘 모르겠다면 해당 항목은 찾지 않는다.
+
+       ----------------------------------------------------------
+       """
+
+        # [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
+
+    question = question + system_template
+    # docs = index.similarity_search(question)
+    result = chain({"question": question, "chat_history": []})
+    # print results
+    print(result['answer'])
+    dict = json.loads(result['answer'])
+    for item in dict:
+        print(item)
+        print(item['itemcode'])
+        print(item['itemname'])
+        print(type(item))
+
+    json_data = json.dumps(dict, ensure_ascii=False)
+    return json_data
 import csv
 output_review =[]
 def review_search(query:str):
-    FILE_NAME = 'D:\sapaback\sapaback\llm\lclogic\GreatingReview.csv'
+    FILE_NAME = 'GreatingReview.csv'
     review_list =[]
     review_list_csv = []
     with open(FILE_NAME, "r") as f:
@@ -279,25 +450,25 @@ def custom_agent_naver():
 
     return
 
-def keyword_agent(query:str):
-    template = '''\
-    {word}과 연관된 음식 키워드를 분류명 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
-     술, 향신료 ,음료, 양념장은 제외하고 나열 해줘 \
-     result should be JSON in the following format: "[<<분류명>:[음식명,음식명,음식명,음식명,음식명]>,....]"
-    '''
+def keyword_agent(query:str,fromdate:str,todate:str):
+    # template = '''\
+    # {word}과 연관된 음식 키워드를 분류명 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
+    #  술, 향신료 ,음료, 양념장은 제외하고 나열 해줘 \
+    #  result should be JSON in the following format: "[<<분류명>:[음식명,음식명,음식명,음식명,음식명]>,....]"
+    # '''
+    #
+    # template = '''\
+    #    {word}과 연관된 음식 키워드를 '분류명' 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
+    #     술, 향신료 ,음료, 양념장은 제외하고 나열 해줘.  \
+    #     for example,
+    #     해산물=[생선,조개,굴,새우,꽃게]
+    #     찌개=[김치찌개,된장찌개,부대찌개,짜글이,마라탕찌개]
+    #     If you don't know the answer, just say you don't know and don't try to make up an answer. \
+    #     result must be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
+    #    '''
 
     template = '''\
-       {word}과 연관된 음식 키워드를 '분류명' 3개와 분류에 속해 있는 음식으로 묶어서 5개씩 한국어로 다 나열해 줘.  \
-        술, 향신료 ,음료, 양념장은 제외하고 나열 해줘.  \
-        for example, 
-        해산물=[생선,조개,굴,새우,꽃게]
-        찌개=[김치찌개,된장찌개,부대찌개,짜글이,마라탕찌개]
-        If you don't know the answer, just say you don't know and don't try to make up an answer. \
-        result must be string in the following format: "<분류명>=[<<value>>,<<value>>,<<value>>] || <분류명>=[<<value>>,<<value>>,<<value>>] || ...."
-       '''
-
-    template = '''\
-           {word}과 연관된 음식 키워드를 '음식 분류명' 3개 이하로 뽑고,  음식 분류에 속해 있는 음식명으로 묶어서 최소 1개 이상씩 나열해 줘.   \
+           {word}과 연관된 음식 키워드를 '음식 분류명' 3개 이하로 뽑고,  음식 분류에 속해 있는 음식명으로 묶어서 5개 이하로 나열해 줘.  \
             술, 양념장은 제외하고 나열 해줘.  \
             for example, 
             해산물=[생선,조개,굴,새우,꽃게] || 찌개=[김치찌개,된장찌개,부대찌개,짜글이,마라탕찌개] || ..... 
@@ -321,8 +492,8 @@ def keyword_agent(query:str):
     nestDic = dict()
     print('listcate',listcate)
     print('listcate 크기', len(listcate))
-    nestDic["startDate"] = "2023-05-01"
-    nestDic["endDate"] = "2023-05-30"
+    nestDic["startDate"] = fromdate
+    nestDic["endDate"] = todate
     nestDic["timeUnit"] = "date" #date week month
     keywordGroupsList = list()
     for idxitem, item in enumerate(listcate):
