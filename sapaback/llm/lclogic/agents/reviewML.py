@@ -19,7 +19,7 @@ def reviewFunction(itemname):
     bad_review = []
     ambi_review = []
     all_review = []
-    all_review_csv = ['상품이름','리뷰','긍부정결과','확률']
+    all_review_csv = []
 
     with open('C:/Users/Lee/SAPA/sapaback/ALL_GREATING_DATA.csv', encoding='utf-8') as f:
         reader = csv.reader(f)
@@ -28,9 +28,8 @@ def reviewFunction(itemname):
             if(flag):
                 flag = False
                 continue
-            if(txt[6] == itemname):
-                item_name.append(txt[6])
-                greating_review.append(txt[8])
+            item_name.append(txt[6])
+            greating_review.append(txt[8])
 
     the_banchan_review = tfv_return().transform(greating_review) ## 약 20초 소요
     # 후처리
@@ -59,7 +58,7 @@ def reviewFunction(itemname):
         all_review.append({"item_name":item_name[cnt],"greating_review":greating_review[cnt],"result":str_result,"probability":probability*100})  #jsonList 위한 전체값
         cnt+=1
 
-    with open('bad_review_list_of_greating_20230713.csv', 'w', newline='', encoding='ANSI') as f:
+    with open('reviewSelect.csv', 'w', newline='', encoding='ANSI') as f:
         makewrite = csv.writer(f)
 
         for value in all_review_csv:
