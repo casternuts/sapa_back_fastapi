@@ -422,6 +422,7 @@ def review_search(query:str):
     print()
     print(f"답변 : {result['answer']}")
 
+    return result['answer']
 
 
 
