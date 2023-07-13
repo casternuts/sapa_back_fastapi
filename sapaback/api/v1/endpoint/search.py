@@ -119,20 +119,40 @@ def naver_cafe():
         return rescode
 
 
-@router.get("/keyword/{word}")
-def get_keyword(word:str):
-
+@router.get("/keyword/{word}/{fromdate}/{todate}")
+def get_keyword(word:str,fromdate:str,todate:str):
+    print(fromdate)
+    print(todate)
     print(word)
     #gpt를 이용해서 키워드를 뽑는다.
-    return lcmain.keyword_agent(word)
+    return lcmain.keyword_agent(word,fromdate,todate)
 
-@router.get("/itemcsv/{word}")
-def get_csv_item(word:str):
+@router.get("/itemcsv/{word}/{category}")
+def get_csv_item(word:str,category:str):
 
     print(word)
+    print(category)
     #gpt를 이용해서 키워드를 뽑는다.
-    return lcmain.csv_search(word)
+    return lcmain.csv_search(word,category)
+@router.get("/itemcsv2/{word}/{category}")
+def get_csv_item2(word:str,category:str):
 
+    print(word)
+    print(category)
+
+    #gpt를 이용해서 키워드를 뽑는다.
+
+    return lcmain.csv_search_split(word, category)
+
+@router.get("/itemcsv3/{word}/{category}")
+def get_csv_item3(word:str,category:str):
+
+    print(word)
+    print(category)
+
+    #gpt를 이용해서 키워드를 뽑는다.
+
+    return lcmain.csv_search_non_split(word, category)
 @router.get("/reviewselect/{word}")
 def get_item_review(word:str):
 
