@@ -63,6 +63,7 @@ from langchain.prompts import (
 )
 
 output =[]
+
 def csv_search(query:str,category:str):
     FILE_NAME = 'gretingcategoryinclude2.csv'
     loader = CSVLoader(FILE_NAME)
