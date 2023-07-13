@@ -62,7 +62,7 @@ from langchain.prompts import (
 
 output =[]
 def csv_search(query:str):
-    FILE_NAME = 'D:\sapaback\sapaback\llm\lclogic\TB_GGG_ansi2.csv'
+    FILE_NAME = 'D:\TB_GGG_ansi2.csv'
     loader = CSVLoader(FILE_NAME)
     # Load the documents
     # loader = CSVLoader(file_path=FILE_NAME, csv_args={

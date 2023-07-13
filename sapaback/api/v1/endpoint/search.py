@@ -2,7 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sapaback.llm.lclogic import lcmain
 from pydantic import BaseModel
-
+from sapaback.llm.lclogic.agents import reviewML
 import json
 import urllib.request
 from sapaback.core.config import settings
@@ -139,3 +139,8 @@ def get_item_review(word:str):
     print(word)
     #gpt를 이용해서 키워드를 뽑는다.
     return lcmain.review_search(word)
+
+@router.get("/reviewFunction/{itemname}")
+def reviewFunction(itemname:str):
+    print(itemname)
+    return reviewML.reviewFunction(itemname)
