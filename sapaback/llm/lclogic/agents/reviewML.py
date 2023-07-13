@@ -12,7 +12,7 @@ import json
 
 def reviewFunction(itemname):
 
-    best_model = joblib.load('C:/Users/Lee/SAPA/sapaback/model_save.joblib')
+    best_model = joblib.load('model_save.joblib')
     greating_review = []
     item_name = []
     good_review = []
@@ -21,7 +21,7 @@ def reviewFunction(itemname):
     all_review = []
     all_review_csv = ['상품이름','리뷰','긍부정결과','확률']
 
-    with open('C:/Users/Lee/SAPA/sapaback/ALL_GREATING_DATA.csv', encoding='utf-8') as f:
+    with open('ALL_GREATING_DATA.csv', encoding='utf-8') as f:
         reader = csv.reader(f)
         flag = True
         for txt in reader:
@@ -59,7 +59,7 @@ def reviewFunction(itemname):
         all_review.append({"item_name":item_name[cnt],"greating_review":greating_review[cnt],"result":str_result,"probability":probability*100})  #jsonList 위한 전체값
         cnt+=1
 
-    with open('bad_review_list_of_greating_20230713.csv', 'w', newline='', encoding='ANSI') as f:
+    with open('reviewSelect.csv', 'w', newline='', encoding='ANSI') as f:
         makewrite = csv.writer(f)
 
         for value in all_review_csv:

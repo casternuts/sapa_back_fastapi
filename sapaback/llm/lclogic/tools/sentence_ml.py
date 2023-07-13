@@ -11,7 +11,7 @@ text = []
 
 def tfv_return():
     #크롤링으로 뽑아낸 데이터 가져오기
-    with open('C:/Users/Lee/SAPA/sapaback/the_banchan_all_review_real_final.csv','rt',encoding='utf-8') as f:
+    with open('the_banchan_all_review_real_final.csv','rt',encoding='utf-8') as f:
         reader = csv.reader(f)
         flag = True # 1번줄은 제목이므로 스킵
 
