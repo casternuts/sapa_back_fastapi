@@ -163,4 +163,4 @@ def get_item_review(word:str):
 @router.get("/reviewFunction/{itemname}")
 def reviewFunction(itemname:str):
     print(itemname)
-    return reviewML.reviewFunction(itemname)
+    return lcmain.review_search_reviews_select(itemname)

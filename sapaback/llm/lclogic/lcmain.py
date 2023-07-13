@@ -327,7 +327,9 @@ def csv_search_non_split(query: str, category: str):
 import csv
 output_review =[]
 def review_search(query:str):
-    FILE_NAME = 'GreatingReview.csv'
+    #FILE_NAME = 'GreatingReview.csv'
+    FILE_NAME = 'reviewSelect_final.csv'
+
     review_list =[]
     review_list_csv = []
     with open(FILE_NAME, "r") as f:
@@ -336,25 +338,26 @@ def review_search(query:str):
         print(type(data_list))
         print(len(data_list))
         for item in data_list:
-            if item['itemname'] == query:
+            if item['item_name'] == query:
                 review_list_csv.append(item)
                 #print(item)
                 #청크 전처리
-                contents = item['contents']
-                contents = re.sub('\n', ' ', contents)  # Replace newline characters with a space
-                contents = re.sub('\t', ' ', contents)  # Replace tab characters with a space
-                contents = re.sub(' +', ' ', contents)  # Reduce multiple spaces to single
-                item['contents'] =contents
-                itemname = item['itemname']
-                itemname = re.sub('\n', ' ', itemname)  # Replace newline characters with a space
-                itemname = re.sub('\t', ' ', itemname)  # Replace tab characters with a space
-                itemname = re.sub(' +', ' ', itemname)  # Reduce multiple spaces to single
-                item['itemname'] = itemname
-                review_list.append('itemname: '+itemname+' '+'contents: '+contents)
+               # contents = item['contents']
+                #contents = re.sub('\n', ' ', contents)  # Replace newline characters with a space
+                #contents = re.sub('\t', ' ', contents)  # Replace tab characters with a space
+                #contents = re.sub(' +', ' ', contents)  # Reduce multiple spaces to single
+                #item['contents'] =contents
+                #itemname = item['itemname']
+                #itemname = re.sub('\n', ' ', itemname)  # Replace newline characters with a space
+                #itemname = re.sub('\t', ' ', itemname)  # Replace tab characters with a space
+                #itemname = re.sub(' +', ' ', itemname)  # Reduce multiple spaces to single
+                #item['itemname'] = itemname
+                #review_list.append('itemname: '+itemname+' '+'contents: '+contents)
 
     # 리스트를 CSV 형식으로 변환.
     with open("output.csv", "w", newline="") as f:
-        fieldnames=['itemname','contents']
+
+        fieldnames=['item_name','greating_review','result','probability']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(review_list_csv)
@@ -572,6 +575,27 @@ def keyword_agent(query:str,fromdate:str,todate:str):
 
 
     return result_dict
+
+import csv
+output_review =[]
+def review_search_reviews_select(query:str):
+    FILE_NAME = 'reviewSelect_final.csv'
+    review_list = []
+    review_list_csv = []
+    with open(FILE_NAME, "r") as f:
+        reader = csv.DictReader(f, delimiter=",", quotechar="\"")
+        data_list = [row for row in reader]
+        print(type(data_list))
+        print(len(data_list))
+        for item in data_list:
+
+            if item['item_name'] == query:
+                print(item['item_name'])
+                review_list_csv.append(item)
+
+    print(type(review_list_csv))
+    print(len(review_list_csv))
+    return json.dumps(review_list_csv,ensure_ascii=False)
 
 
 
