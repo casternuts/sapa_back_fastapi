@@ -279,34 +279,48 @@ def csv_search_non_split(query: str, category: str):
 
     embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
     index = Chroma.from_documents(doc_chunks, embeddings)
-    model = ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0.1, model_name="gpt-3.5-turbo")
+    model = ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0, model_name="gpt-3.5-turbo")
     chain = ChatVectorDBChain.from_llm(model, index, return_source_documents=True)
 
     # gpt를 이용해서 키워드를 뽑는다.
     resultList = []
 
         # question = category+"에 속한 "+ item + "비슷한 종류인 항목을 나열하고, 왜 나열했는지 이유를 알려줘."
-    question = category + "에 속한 " + query + "을 ',' 단위로 구분해서 각각 비슷한 종류인 항목을 나열해, 왜 나열했는지 이유를 자세히 알려줘."
+    question = category + "에 속한 " + query + "을 ',' 단위로 구분해서 각각 주어진 정보 안에서 비슷한 종류인 항목을 나열해, 왜 나열했는지 이유를 자세히 알려줘. "
 
-    system_template = """To answer the question at the end, use the following context. 
-       If you don't know the answer, just say you don't know and don't try to make up an answer.
-       you only answer in Korean. 
-        but if there are no answers, you say [{"itemcode":"없음" itemname":"없음","reason":"없음"}]
+    # system_template = """
+    #    If you don't know the answer, just say you don't know and don't try to make up an answer.
+    #    you only answer in Korean.
+    #     but if there are no answers, you say [{"itemcode":"없음" itemname":"없음","reason":"없음"}]
+    #
+    #    answer form example
+    #    [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
+    #    아래는 반드시 지켜야 할 조건이야
+    #    -------------------------------
+    #     1. 음식을 구분하는 종류가 같거나 비슷한 항목 또는 조리방법이 비슷한 항목
+    #     for example:
+    #     바베큐는 소고기 돼지고기 부위를 구이 하거나 생선 (삼치 구이,고등어 구이...)를 구이하는 것과 같고 , 탕은 찌개 국, 파스타는 면,소바,국수,라면, 과일은 과일이 들어간 음료나 빵 디저트 혹은 음식
+    #
+    #     2. 주어진 키워드 개수에 맞춰서 골고루 비슷한 음식을 찾는다
+    #     3. 음식을 구성하고 있는 재료가 비슷한 음식을 찾는다
+    #     4. 이유는 정확 해야 하며 잘 모르겠다면 해당 항목은 찾지 않는다.
+    #
+    #    ----------------------------------------------------------
+    #    """
 
-       answer form example
-       [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
-       아래는 반드시 지켜야 할 조건이야
-       -------------------------------
-        1. 음식을 구분하는 종류가 같거나 비슷한 항목
-        for example:
-        바베큐는 소고기 돼지고기 부위를 구이 하거나 생선 (삼치 구이,고등어 구이...)를 구이하는 것과 같고 , 탕은 찌개 국, 파스타는 면,소바,국수,라면, 과일은 과일이 들어간 음료나 빵 디저트 혹은 음식
-    
-        2. 주어진 키워드 개수에 맞춰서 골고루 비슷한 음식을 찾는다
-        3. 음식을 구성하고 있는 재료가 비슷한 음식을 찾는다
-        4. 이유는 정확 해야 하며 잘 모르겠다면 해당 항목은 찾지 않는다.
+    system_template = """
+          If you don't know the answer, just say you don't know and don't try to make up an answer.
+          you only answer in Korean. 
 
-       ----------------------------------------------------------
-       """
+          answer form example
+          [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
+          The following are the rules that must be followed.
+          -------------------------------
+           1.  List  items  with similar food types or food categories or similar food cuisines.
+           2.  if there are no answers, you say [{"itemcode":"없음" itemname":"없음","reason":"없음"}]
+
+          ----------------------------------------------------------
+          """
 
         # [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]
 
@@ -324,6 +338,71 @@ def csv_search_non_split(query: str, category: str):
 
     json_data = json.dumps(dict, ensure_ascii=False)
     return json_data
+
+
+
+from langchain.retrievers.self_query.base import SelfQueryRetriever
+from langchain.chains.query_constructor.base import AttributeInfo
+def csv_search_selfquery(query: str, category: str):
+    FILE_NAME = 'gretingcategoryinclude2.csv'
+    loader = CSVLoader(FILE_NAME)
+    # Load the documents
+
+    documents = loader.load()
+
+    # text 정제
+    for page in documents:
+        text = page.page_content
+        text = re.sub('\n', ' ', text)  # Replace newline characters with a space
+        text = re.sub('\t', ' ', text)  # Replace tab characters with a space
+        text = re.sub(' +', ' ', text)  # Reduce multiple spaces to single
+        output.append(text)
+
+    #
+    doc_chunks = []
+    #
+    for line in output:
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,  # 최대 청크 길이
+            separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""],  # 텍스트를 청크로 분할하는 데 사용되는 문자 목록
+            chunk_overlap=0,  # 인접한 청크 간에 중복되는 문자 수
+        )
+        chunks = text_splitter.split_text(line)
+        for i, chunk in enumerate(chunks):
+            doc = Document(
+                page_content=chunk, metadata={"page": i, "source": FILE_NAME}
+            )
+            doc_chunks.append(doc)
+
+    embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
+    index = Chroma.from_documents(doc_chunks, embeddings)
+
+    metadata_field_info = [
+        AttributeInfo(
+            name="itemcode",
+            description="The itemcode of item",
+            type="string",
+        ),
+        AttributeInfo(
+            name="itemname",
+            description="the food name of item",
+            type="string",
+        )
+
+    ]
+
+    document_content_description = "list of food"
+    llm1 = ChatOpenAI(openai_api_key=settings.OPEN_API_KEY, temperature=0, model_name="gpt-3.5-turbo")
+    retriever = SelfQueryRetriever.from_llm(llm1, index, document_content_description, metadata_field_info,verbose=True)
+    quest:str =  'List items that are similar to' + query +'or' + 'List items that are in the same category as'+ query +'or' +'List items that are of the same type as'+query+'you must answer not duplicated'
+    condition = '''answer form
+     [{"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}, {"itemcode": << itemcode >>, "itemname": << itemname >>, "reason": << reason >>}....]'''
+    #res = retriever.get_relevant_documents('List items that are similar to 설렁탕,감자탕,뼈해장국,순대국')
+    res = retriever.get_relevant_documents(quest)
+
+    return res
+
+
 import csv
 output_review =[]
 def review_search(query:str):
@@ -415,7 +494,7 @@ def review_search(query:str):
         # reduce_k_below_max_tokens=True
     )
 
-    result = bk_chain({"question": query + '제품의 contents 내용을 이용해 장점 또는 단점을 분석하고 제품을 어떤 관점으로 판매하면 좋을지 얘기해줘 '})
+    result = bk_chain({"question": query + '제품의 contents 내용을 이용해 장점 또는 단점을 분석하고 제품을 어떤 관점으로 판매하면 좋을지 얘기해줘. '})
     #result = bk_chain({"question": query + '제품의 contents 내용을 이용해 contents의 전체적인 요약과 마케팅 인사이트를 제시해 '})
 
     print(f"질문 : {result['question']}")

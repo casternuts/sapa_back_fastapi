@@ -153,6 +153,15 @@ def get_csv_item3(word:str,category:str):
     #gpt를 이용해서 키워드를 뽑는다.
 
     return lcmain.csv_search_non_split(word, category)
+@router.get("/itemcsv4/{word}/{category}")
+def get_csv_item4(word:str,category:str):
+
+    print(word)
+    print(category)
+
+    #gpt를 이용해서 키워드를 뽑는다.
+
+    return lcmain.csv_search_selfquery(word, category)
 @router.get("/reviewselect/{word}")
 def get_item_review(word:str):
 
