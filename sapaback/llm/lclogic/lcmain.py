@@ -391,13 +391,22 @@ def review_search(query:str):
 
     embeddings = OpenAIEmbeddings(openai_api_key=settings.OPEN_API_KEY)
     index = Chroma.from_documents(doc_chunks, embeddings)
+
     #
     system_template = """To answer the question at the end, use the following context.
     If you don't know the answer, just say you don't know and don't try to make up an answer.
     You should only mention the marketing insight that are similar to or relevant to the provided contents.       
-       you only answer in Korean
-       
-
+    아래는 답변 형식 이야 
+    ---------------------------------
+    <strong> Summary of the Contents </strong> 
+    
+    <p style='color:blue'><strong> Pros: </strong></p>
+    <p style='color:red'><strong> Cons: </strong></p> 
+    <strong> Marketing Insights </strong>
+     -------------------------------------  
+    you must be only answer in Korean or translate into korean
+        
+        
        {summaries}
        """
     messages = [
@@ -415,14 +424,24 @@ def review_search(query:str):
         # reduce_k_below_max_tokens=True
     )
 
-    result = bk_chain({"question": query + '제품의 contents 내용을 이용해 장점 또는 단점을 분석하고 제품을 어떤 관점으로 판매하면 좋을지 얘기해줘 '})
+    #result = bk_chain({"question": query + '제품의 contents 내용을 이용해 장점 또는 단점을 분석하고 제품을 어떤 관점으로 판매하면 좋을지 얘기해 줘.'                                           '답변할 때 장점 내용 전체를 <strong class="good"> 태그로 감싸고 단점 전체를 구분 할 수 있도록 <strong class="bad"> 태그로 감싸줘'})
+    # result = bk_chain({"question": query + '제품의 contents 내용을 이용해 장점 또는 단점을 분석하고 제품을 어떤 관점으로 판매하면 좋을지 얘기해 줘. '})
     #result = bk_chain({"question": query + '제품의 contents 내용을 이용해 contents의 전체적인 요약과 마케팅 인사이트를 제시해 '})
+    #result = bk_chain({"question": 'Please provide a summary of the contents and pros and cons factor, marketing insights based on the contents of '+query+' and Please wrap the pros and cons factor or marketing insights with the <strong> tag.' })
+    result = bk_chain({ "question": 'you must be only answer in Korean or translate into korean. Please provide a summary of the contents and pros and cons factor, marketing insights based on the contents of ' + query + ' and Please wrap the pros and cons factor or marketing insights with the <strong> tag.'})
 
     print(f"질문 : {result['question']}")
     print()
     print(f"답변 : {result['answer']}")
+    res:str = result['answer']
+    res = res.replace("Pros:","<p style='color:blue'><strong>장점:</strong></p>")
+    res = res.replace("Cons:", "<p style='color:red'><strong>단점:</strong></p>")
+    res = res.replace("장점:", "<p style='color:blue'><strong>장점:</strong></p>")
+    res = res.replace("단점:", "<p style='color:red'><strong>단점:</strong></p>")
+    res = res.replace("<strong>장점:</strong>", "<p style='color:blue'><strong>장점:</strong></p>")
+    res = res.replace("<strong>단점:</strong>", "<p style='color:red'><strong>단점:</strong></p>")
 
-    return result['answer']
+    return res
 
 
 
